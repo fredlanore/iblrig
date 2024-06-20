@@ -163,6 +163,10 @@ class HardwareSettingsCamera(BunchModel):
     )
 
 
+class HardwareSettingsNeurophotometrics(BunchModel):
+    BONSAI_WORKFLOW: Path
+
+
 class HardwareSettingsCameraWorkflow(BunchModel):
     setup: ExistingFilePath | None = Field(
         title='Optional camera setup workflow',
@@ -201,6 +205,7 @@ class HardwareSettings(BunchModel):
     device_scale: HardwareSettingsScale = HardwareSettingsScale()
     device_cameras: dict[str, dict[str, HardwareSettingsCameraWorkflow | HardwareSettingsCamera]] | None
     device_microphone: HardwareSettingsMicrophone | None = None
+    device_neurophotometrics: HardwareSettingsNeurophotometrics | None = None
     VERSION: str
 
 
