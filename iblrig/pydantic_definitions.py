@@ -165,6 +165,7 @@ class HardwareSettingsCamera(BunchModel):
 
 class HardwareSettingsNeurophotometrics(BunchModel):
     BONSAI_WORKFLOW: Path
+    COM_NEUROPHOTOMETRY: str | None = None
 
 
 class HardwareSettingsCameraWorkflow(BunchModel):
