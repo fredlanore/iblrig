@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from pandas.core.dtypes.concat import union_categoricals
 
@@ -56,7 +57,7 @@ def bpod_session_events_to_dataframe(bpod_data: list[dict[str, Any]], trials: in
     Returns
     -------
     pd.DataFrame
-        A Pandas DataFrame containing combined event data from the specified trials, with columns for time, event, channel,
+        A Pandas DataFrame containing combined event data from the specified trials, with columns for time, trial, event, channel,
         and value.
     """
     # define trial index
@@ -95,7 +96,8 @@ def _bpod_trial_events_to_dataframe(bpod_trial_data: dict[str, Any], trial: int)
     Returns
     -------
     pd.DataFrame
-        A Pandas DataFrame containing the event data for the specified trial, with columns for time, event, channel, and value.
+        A Pandas DataFrame containing the event data for the specified trial, with columns for time, trial event, channel,
+        and value.
     """
     trial_start = bpod_trial_data['Trial start timestamp']
     trial_end = bpod_trial_data['Trial end timestamp']
@@ -115,5 +117,54 @@ def _bpod_trial_events_to_dataframe(bpod_trial_data: dict[str, Any], trial: int)
     df['Channel'] = df['Channel'].astype('category')
     df['Value'] = df['Value'].replace({'Low': 0, 'High': 1, 'Out': 0, 'In': 1})
     df['Value'] = pd.to_numeric(df['Value'], errors='coerce', downcast='unsigned', dtype_backend='numpy_nullable')
+
+    return df
+
+
+def bpod_session_states_to_dataframe(bpod_data: list[dict[str, Any]], trials: int | list[int] | slice | None = None):
+    """
+    Convert Bpod session data into a single Pandas DataFrame.
+
+    Parameters
+    ----------
+    bpod_data : list of dict
+        A list of dictionaries as returned by load_task_jsonable, where each dictionary contains data for a single trial.
+    trials : int, list of int, slice, or None, optional
+        Specifies which trials to include in the DataFrame. All trials are included by default.
+
+    Returns
+    -------
+    pd.DataFrame
+        A Pandas DataFrame containing combined event data from the specified trials, with columns for time, trial, event, channel,
+        and value.
+    """
+    # define trial index
+    if trials is None:
+        trials = range(len(bpod_data))
+    elif isinstance(trials, slice):
+        trials = range(len(bpod_data))[trials]
+
+    # loop over requested trials
+    dataframes = []
+    for trial in trials:
+        dataframes.append(_bpod_trial_states_to_dataframe(bpod_data[trial], trial))
+
+    # combine trials into a single dataframe
+    categories_state = union_categoricals([df['State'] for df in dataframes])
+    for df in dataframes:
+        df['State'] = df['State'].cat.set_categories(categories_state.categories)
+    return pd.concat(dataframes, ignore_index=True)
+
+
+def _bpod_trial_states_to_dataframe(bpod_trial_data: dict[str, Any], trial: int) -> pd.DataFrame:
+    data = bpod_trial_data['States timestamps']
+    trial_start = bpod_trial_data['Trial start timestamp']
+
+    state_list = sorted([(t0, t1, state) for state, times in data.items() for t0, t1 in times if not np.isnan(t0)])
+    df = pd.DataFrame(data=state_list, columns=['Start Time', 'End Time', 'State'])
+    df['Start Time'] = pd.to_timedelta(df['Start Time'] + trial_start)
+    df['End Time'] = pd.to_timedelta(df['End Time'] + trial_start)
+    df['State'] = df['State'].astype('category')
+    df.insert(0, 'Trial', pd.to_numeric(pd.Series(trial, index=df.index), downcast='unsigned'))
 
     return df
