@@ -25,7 +25,7 @@ dependencies = [
     "iblpybpod @ git+https://github.com/int-brain-lab/iblpybpod.git@no-gui",
     "iblutil>=1.13.0",
     "iblqt>=0.2.0",
-    "ONE-api>=2.9.1",
+    "ONE-api>=2.11.0",
     "tycmd-wrapper>=0.2.1",
     #
     # Everything else

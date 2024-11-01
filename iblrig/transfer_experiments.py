@@ -12,7 +12,7 @@ from pathlib import Path
 
 import ibllib.pipes.misc
 import iblrig
-import one.alf.files as alfiles
+import one.alf.path as alfiles
 from ibllib.io import raw_data_loaders, session_params
 from ibllib.pipes.misc import sleepless
 from iblrig.raw_data_loaders import load_task_jsonable

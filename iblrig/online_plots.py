@@ -11,6 +11,7 @@ import seaborn as sns
 from pandas.api.types import CategoricalDtype
 
 import one.alf.io
+import one.alf.path
 from iblrig.choiceworld import get_subject_training_info
 from iblrig.misc import online_std
 from iblrig.raw_data_loaders import load_task_jsonable
@@ -50,7 +51,7 @@ class DataModel:
     time_elapsed = 0.0
 
     def __init__(self, settings_file: Path | None):
-        self.session_path = one.alf.files.get_session_path(settings_file) or ''
+        self.session_path = one.alf.path.get_session_path(settings_file) or ''
         self.last_trials = pd.DataFrame(
             columns=['correct', 'signed_contrast', 'stim_on', 'play_tone', 'reward_time', 'error_time', 'response_time'],
             index=np.arange(NTRIALS_PLOT),
