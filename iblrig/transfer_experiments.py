@@ -7,17 +7,18 @@ import socket
 import traceback
 import uuid
 from enum import IntEnum
+from typing import Iterable
 from os.path import samestat
 from pathlib import Path
 
 import ibllib.pipes.misc
 import iblrig
-import one.alf.files as alfiles
+import one.alf.path as alfiles
 from ibllib.io import raw_data_loaders, session_params
 from ibllib.pipes.misc import sleepless
 from iblrig.raw_data_loaders import load_task_jsonable
 from iblutil.io import hashfile
-from one.util import ensure_list
+from iblutil.util import ensure_list
 
 log = logging.getLogger(__name__)
 
@@ -587,9 +588,82 @@ class NeurophotometricsCopier(SessionCopier):
     assert_connect_on_init = True
 
     def initialize_experiment(self, acquisition_description=None, **kwargs):
-        if not acquisition_description:
-            acquisition_description = dict(devices={'neurophotometrics': {'NP3002': None}})
-            # TODO add the sync file with DAQami
-            # sync_file = Path(iblrig.__file__).parent.joinpath('device_descriptions', 'sync', 'daqami.yaml')
-            self._experiment_description = acquisition_description
-            super().initialize_experiment(acquisition_description=acquisition_description, **kwargs)
+        assert acquisition_description is not None, 'No acquisition description provided'
+        self._experiment_description = acquisition_description
+        super().initialize_experiment(acquisition_description=acquisition_description, **kwargs)
+
+    @staticmethod
+    def neurophotometrics_description(
+        rois: Iterable[str],
+        locations: Iterable[str],
+        sync_channel: int,
+        start_time: datetime.datetime = None,
+        sync_label: str = None,
+        collection: str = 'raw_photometry_data',
+    ) -> dict:
+        """
+        This function creates the `neurophotometrics` description part for the specified parameters.
+
+        Parameters
+        ----------
+        rois: list of strings
+            List of ROIs
+        locations: list of strings
+            List of brain regions
+        sync_channel: int
+            Channel number for sync
+        start_time: datetime.datetime, optional
+            Date and time of the recording
+        sync_label: str, optional
+            Label for the sync channel
+
+        Returns
+        -------
+        dict
+            Description of the neurophotometrics data
+            {neurophotometrics': ...}, see below for the yaml rendition of dictionaries
+
+
+        Example where bpod sends sync to the neurophotometrics:
+        -------
+            neurophotometrics:
+                G0:
+                  collection: raw_photometry_data
+                  location: VTA
+                G1:
+                  collection: raw_photometry_data
+                  location: DR
+                sync_label: bnc1out
+                sync_channel: 1
+                datetime: 2024-09-19T14:13:18.749259
+            sync:
+                bpod
+
+        Here MAIN_SYNC=True on behaviour
+
+        Example where a DAQ records frame times and sync:
+        -------
+            neurophotometrics:
+                G0:
+                  collection: raw_photometry_data
+                  location: VTA
+                G1:
+                  collection: raw_photometry_data
+                  location: DR
+                sync_channel: 5
+                datetime: 2024-09-19T14:13:18.749259
+            sync:
+                daqami:
+                    acquisition_software: daqami
+                    collection: raw_sync_data
+                    extension: bin
+        """
+        date_time = datetime.datetime.now() if start_time is None else start_time
+        description = {
+            'sync_channel': sync_channel,
+            'datetime': date_time.isoformat(),
+        }
+        if sync_label is not None:
+            description['sync_label'] = sync_label
+        description.update({roi: {'collection': collection, 'location': location} for roi, location in zip(rois, locations)})
+        return description
