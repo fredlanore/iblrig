@@ -17,7 +17,7 @@ class TestExperimentDescription(unittest.TestCase):
         dexpected = {
             'sync_channel': 3,
             'datetime': '2024-10-11T11:11:00',
-            'G0': {'collection': 'raw_photometry_data', 'location': 'SI'},
-            'G1': {'collection': 'raw_photometry_data', 'location': 'VTA'},
+            'collection': 'raw_photometry_data',
+            'fibers': {'G0': {'location': 'SI'}, 'G1': {'location': 'VTA'}},
         }
         self.assertEqual(dexpected, d)
