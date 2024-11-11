@@ -130,9 +130,9 @@ class ChoiceWorldSession(
         self.trials_table = self.TrialDataModel.preallocate_dataframe(NTRIALS_INIT)
         self.ambient_sensor_table = pd.DataFrame(
             {
-                'Temperature_C': np.zeros(NTRIALS_INIT) * np.NaN,
-                'AirPressure_mb': np.zeros(NTRIALS_INIT) * np.NaN,
-                'RelativeHumidity': np.zeros(NTRIALS_INIT) * np.NaN,
+                'Temperature_C': np.zeros(NTRIALS_INIT) * np.nan,
+                'AirPressure_mb': np.zeros(NTRIALS_INIT) * np.nan,
+                'RelativeHumidity': np.zeros(NTRIALS_INIT) * np.nan,
             }
         )
 
@@ -410,7 +410,7 @@ class ChoiceWorldSession(
         # No-go: hide the visual stimulus and play white noise. Go to exit_state after FEEDBACK_NOGO_DELAY_SECS.
         sma.add_state(
             state_name='no_go',
-            state_timer=self.task_params.FEEDBACK_NOGO_DELAY_SECS,
+            state_timer=self.feedback_nogo_delay,
             output_actions=[self.bpod.actions.bonsai_hide_stim, self.bpod.actions.play_noise],
             state_change_conditions={'Tup': 'exit_state'},
         )
@@ -425,7 +425,7 @@ class ChoiceWorldSession(
         )
         sma.add_state(
             state_name='error',
-            state_timer=self.task_params.FEEDBACK_ERROR_DELAY_SECS,
+            state_timer=self.feedback_error_delay,
             output_actions=[self.bpod.actions.play_noise],
             state_change_conditions={'Tup': 'hide_stim'},
         )
@@ -446,7 +446,7 @@ class ChoiceWorldSession(
         )
         sma.add_state(
             state_name='correct',
-            state_timer=self.task_params.FEEDBACK_CORRECT_DELAY_SECS - self.reward_time,
+            state_timer=self.feedback_correct_delay - self.reward_time,
             output_actions=[],
             state_change_conditions={'Tup': 'hide_stim'},
         )
@@ -491,15 +491,12 @@ class ChoiceWorldSession(
         quiescent_period = self.task_params.QUIESCENT_PERIOD + misc.truncated_exponential(
             scale=0.35, min_value=0.2, max_value=0.5
         )
-        stim_gain = (
-            self.session_info.ADAPTIVE_GAIN_VALUE if self.task_params.get('ADAPTIVE_GAIN', False) else self.task_params.STIM_GAIN
-        )
         self.trials_table.at[self.trial_num, 'quiescent_period'] = quiescent_period
         self.trials_table.at[self.trial_num, 'contrast'] = contrast
         self.trials_table.at[self.trial_num, 'stim_phase'] = random.uniform(0, 2 * math.pi)
         self.trials_table.at[self.trial_num, 'stim_sigma'] = self.task_params.STIM_SIGMA
         self.trials_table.at[self.trial_num, 'stim_angle'] = self.task_params.STIM_ANGLE
-        self.trials_table.at[self.trial_num, 'stim_gain'] = stim_gain
+        self.trials_table.at[self.trial_num, 'stim_gain'] = self.stimulus_gain
         self.trials_table.at[self.trial_num, 'stim_freq'] = self.task_params.STIM_FREQ
         self.trials_table.at[self.trial_num, 'stim_reverse'] = self.task_params.STIM_REVERSE
         self.trials_table.at[self.trial_num, 'trial_num'] = self.trial_num
@@ -611,6 +608,18 @@ class ChoiceWorldSession(
     @property
     def quiescent_period(self):
         return self.trials_table.at[self.trial_num, 'quiescent_period']
+
+    @property
+    def feedback_correct_delay(self):
+        return self.task_params['FEEDBACK_CORRECT_DELAY_SECS']
+
+    @property
+    def feedback_error_delay(self):
+        return self.task_params['FEEDBACK_ERROR_DELAY_SECS']
+
+    @property
+    def feedback_nogo_delay(self):
+        return self.task_params['FEEDBACK_NOGO_DELAY_SECS']
 
     @property
     def position(self):
@@ -771,7 +780,7 @@ class ActiveChoiceWorldSession(ChoiceWorldSession):
         self.trials_table.at[self.trial_num, 'response_time'] = response_time
         # get the trial outcome
         state_names = ['correct', 'error', 'no_go', 'omit_correct', 'omit_error', 'omit_no_go']
-        raw_outcome = {sn: ~np.isnan(bpod_data['States timestamps'].get(sn, [[np.NaN]])[0][0]) for sn in state_names}
+        raw_outcome = {sn: ~np.isnan(bpod_data['States timestamps'].get(sn, [[np.nan]])[0][0]) for sn in state_names}
         try:
             outcome = next(k for k in raw_outcome if raw_outcome[k])
             # Update response buffer -1 for left, 0 for nogo, and 1 for rightward
@@ -820,7 +829,7 @@ class BiasedChoiceWorldSession(ActiveChoiceWorldSession):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.blocks_table = pd.DataFrame(
-            {'probability_left': np.zeros(NBLOCKS_INIT) * np.NaN, 'block_length': np.zeros(NBLOCKS_INIT, dtype=np.int16) * -1}
+            {'probability_left': np.zeros(NBLOCKS_INIT) * np.nan, 'block_length': np.zeros(NBLOCKS_INIT, dtype=np.int16) * -1}
         )
 
     def new_block(self):
@@ -929,6 +938,10 @@ class TrainingChoiceWorldSession(ActiveChoiceWorldSession):
     def default_reward_amount(self):
         return self.session_info.get('ADAPTIVE_REWARD_AMOUNT_UL', self.task_params.REWARD_AMOUNT_UL)
 
+    @property
+    def stimulus_gain(self) -> float:
+        return self.session_info.get('ADAPTIVE_GAIN_VALUE')
+
     def get_subject_training_info(self):
         """
         Get the previous session's according to this session parameters and deduce the
@@ -997,7 +1010,9 @@ class TrainingChoiceWorldSession(ActiveChoiceWorldSession):
             do_debias_trial = (self.trials_table.loc[self.trial_num - 1, 'trial_correct'] != 1) and last_contrast >= 0.5
             self.trials_table.at[self.trial_num, 'debias_trial'] = do_debias_trial
             if do_debias_trial:
-                iresponse = self.trials_table['response_side'] != 0  # trials that had a response
+                iresponse = np.logical_and(
+                    ~self.trials_table['response_side'].isna(), self.trials_table['response_side'] != 0
+                )  # trials that had a response
                 # takes the average of right responses over last 10 response trials
                 average_right = np.mean(self.trials_table['response_side'][iresponse[-np.maximum(10, iresponse.size) :]] == 1)
                 # the next probability of next stimulus being on the left is a draw from a normal distribution
@@ -1016,6 +1031,7 @@ class TrainingChoiceWorldSession(ActiveChoiceWorldSession):
         info_dict = {
             'Contrast Set': np.unique(np.abs(choiceworld.contrasts_set(self.training_phase))),
             'Training Phase': self.training_phase,
+            'Debias Trial': self.trials_table.at[self.trial_num, 'debias_trial'],
         }
 
         # update info dict with extra_info dict
