@@ -4,21 +4,31 @@ import logging
 from collections.abc import Iterable
 
 import iblrig.path_helper
+from iblatlas.atlas import BrainRegions
 from iblrig.constants import BASE_PATH
 from iblrig.pydantic_definitions import HardwareSettings
 from iblrig.tools import call_bonsai
+from iblrig.transfer_experiments import NeurophotometricsCopier
 from iblutil.util import setup_logger
 
 _logger = logging.getLogger(__name__)
 
 
+def _get_neurophotometrics_copier(session_stub: str) -> tuple[NeurophotometricsCopier, dict]:
+    dict_paths = iblrig.path_helper.get_local_and_remote_paths()
+    session_path = dict_paths['local_subjects_folder'].joinpath(session_stub)
+    npc = NeurophotometricsCopier(session_path=session_path, remote_subjects_folder=dict_paths['remote_subjects_folder'])
+    return npc, dict_paths
+
+
 def start_workflow_cmd(debug: bool = False):
     """
     Start a photometry recording regardless of behaviour.
+    This should happen before the neurophotometrics recording has been started.
     """
-    # format the current date and time as a standard string
     hardware_settings: HardwareSettings = iblrig.path_helper.load_pydantic_yaml(HardwareSettings)
     settings = hardware_settings.device_neurophotometrics
+    # format the current date and time as a standard string
     datestr = datetime.datetime.now().strftime('%Y-%m-%d')
     timestr = datetime.datetime.now().strftime('T%H%M%S')
     dict_paths = iblrig.path_helper.get_local_and_remote_paths()
@@ -39,24 +49,49 @@ def start_workflow_cmd(debug: bool = False):
     )
 
 
-def init_neurophotometrics_session(subject: str, rois: Iterable[str], locations: Iterable[str], sync_channel: int = 1):
-    # TODO this needs to link the session (subject/date/number) to a photometry recording
-    # this means
-    # 1) link from one session to possibly several regions (ie. columns of the datafile)
-    # 2) link one session to a digital input number
-    # we use a single entry point for both modes of acquisition (ie. with or without a daq)
+def init_neurophotometrics_subject(
+    session_stub: str, rois: Iterable[str], locations: Iterable[str], sync_channel: int = 1, **kwargs
+) -> NeurophotometricsCopier:
+    """
+    Initialize a neurophotometrics behavior session.
+    This should happen after the neurophotometrics recording has been started.
+    - Creates a new folder for the session on the photometry computer.
+    - Creates a new experiment description file in the session folder.
+    - Copies the experiment description stub to the server
 
-    # first read in the columns name from the photometry file
-    # then locate the sessions acquired from the same day on the local server
-    # for the case without a DAQ
-    #   at last the digital input is hardcoded from input1 input0
-    # for the case with a DAQ
-    #   we need a hardware setting linking the rig name to a daq channel
-    #   we get the rig name from the stub file on the server / UDP or ask for it in the GUI
+    Parameters
+    ----------
+    session_stub : str
+        The name of the subject for this session.
+    rois : Iterable[str]
+        List of ROIs to be recorded.
+    locations : Iterable[str]
+        List of brain locations to be recorded.
+    sync_channel : int, optional
+        Channel to use for syncing photometry and digital inputs, by default 1
+    kwargs : dict, optional
+        Additional keyword arguments to be passed to the NeurophotometricsCopier.neurophotometrics_description method.
 
-    # copier = NeurophotometricsCopier(session_path=session_path, remote_subjects_folder=session.paths.REMOTE_SUBJECT_FOLDER)
-    # copier.initialize_experiment(acquisition_description=copier.config2stub(config, raw_data_folder.name))
-    pass
+    Returns
+    -------
+     NeurophotometricsCopier
+        An instance of the NeurophotometricsCopier class initialized with the provided session details.
+    """
+    # I put the import here as it may slow down
+    regions = BrainRegions()
+    if not all(map(lambda x: x in regions.acronym, locations)):
+        _logger.warning(f'Brain regions {locations} not found in BrainRegions acronyms')
+    npc, dict_paths = _get_neurophotometrics_copier(session_stub)
+    description = NeurophotometricsCopier.neurophotometrics_description(rois, locations, sync_channel, **kwargs)
+    npc.initialize_experiment(acquisition_description=description)
+    return npc
+
+
+def copy_photometry_subject(session_stub: str) -> bool:
+    npc, dict_paths = _get_neurophotometrics_copier(session_stub)
+    folder_neurophotometric = dict_paths['local_data_folder'].joinpath('neurophotometrics')
+    status = npc.copy_collections(folder_neurophotometric=folder_neurophotometric)
+    return status
 
 
 def start_photometry_task_cmd():
@@ -87,4 +122,4 @@ def start_photometry_task_cmd():
     assert len(args.roi) == len(args.location), 'The number of ROIs and locations must be the same.'
 
     setup_logger(name='iblrig', level='DEBUG' if args.debug else 'INFO')
-    init_neurophotometrics_session(subject=args.subject, rois=args.roi, locations=args.location, sync_channel=args.sync_channel)
+    init_neurophotometrics_subject(subject=args.subject, rois=args.roi, locations=args.location, sync_channel=args.sync_channel)
