@@ -11,6 +11,10 @@ from typing import Iterable
 from os.path import samestat
 from pathlib import Path
 
+import pandera
+import pandas as pd
+import numpy as np
+
 import ibllib.pipes.misc
 import iblrig
 import one.alf.path as alfiles
@@ -676,16 +680,12 @@ class NeurophotometricsCopier(SessionCopier):
         return description
 
     def _copy_collections(self, folder_neurophotometric: Path) -> bool:
-        import pandera
-        import pandas as pd
-        import numpy as np
-
         ed = self.experiment_description
         dt = datetime.datetime.fromisoformat(ed['datetime'])
         # Here we find the first photometry folder after the start_time. In case this is failing
         # we can feed a custom start_time to go to the desired folder, or just rename the folder
         folder_day = next(folder_neurophotometric.glob(ed['datetime'][:10]), None)
-        assert folder_day.exists(), f'Neurophotometrics folder {folder_neurophotometric} not found'
+        assert folder_day is not None, f"Neurophotometrics folder {folder_neurophotometric} doesn't contain data"
         folder_times = list(folder_day.glob('T*'))
         assert len(folder_times) >= 1, f'No neurophotometrics acquisition files found in {folder_day}'
         hhmmss = sorted([int(stem[1:]) for stem in [f.stem for f in folder_times]])
@@ -706,7 +706,7 @@ class NeurophotometricsCopier(SessionCopier):
                 SystemTimestamp=pandera.Column(pandera.Float64),
                 LedState=pandera.Column(pandera.Int16, coerce=True),
                 ComputerTimestamp=pandera.Column(pandera.Float64),
-                **{k: pandera.Column(pandera.Float64) for k in ed['fibers'].keys()},
+                **{k: pandera.Column(pandera.Float64) for k in ed['fibers']},
             )
         )
         schema_digital_inputs = pandera.DataFrameSchema(

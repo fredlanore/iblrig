@@ -2,12 +2,6 @@ import argparse
 from collections.abc import Iterable
 import datetime
 import logging
-from pathlib import Path
-import shutil
-
-import numpy as np
-import pandas as pd
-import pandera
 
 from iblatlas.atlas import BrainRegions
 from iblutil.util import setup_logger
@@ -94,10 +88,11 @@ def init_neurophotometrics_subject(
     return npc
 
 
-def copy_photometry_subject(session_stub: str) -> None:
+def copy_photometry_subject(session_stub: str) -> bool:
     npc, dict_paths = _get_neurophotometrics_copier(session_stub)
     folder_neurophotometric = dict_paths['local_data_folder'].joinpath('neurophotometrics')
     status = npc.copy_collections(folder_neurophotometric=folder_neurophotometric)
+    return status
 
 
 def start_photometry_task_cmd():
