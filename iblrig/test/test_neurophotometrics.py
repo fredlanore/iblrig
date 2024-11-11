@@ -1,7 +1,6 @@
 import datetime
 import unittest
 
-
 from iblrig.transfer_experiments import NeurophotometricsCopier
 
 
