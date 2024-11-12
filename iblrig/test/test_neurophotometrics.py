@@ -19,4 +19,4 @@ class TestExperimentDescription(unittest.TestCase):
             'collection': 'raw_photometry_data',
             'fibers': {'G0': {'location': 'SI'}, 'G1': {'location': 'VTA'}},
         }
-        self.assertEqual(dexpected, d)
+        self.assertEqual(dexpected, d['neurophotometrics'])
