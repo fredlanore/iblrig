@@ -34,7 +34,7 @@ dependencies = [
     "graphviz>=0.20.3",
     "ipython>=8.26.0",
     "matplotlib>=3.9.2",
-    "numpy>=1.26.4",
+    "numpy<2.0.0",
     "packaging>=24.1",
     "pandas>=2.2.3",
     "pandera>=0.20.4",
