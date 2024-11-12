@@ -16,7 +16,6 @@ from annotated_types import Interval, IsNan
 from pydantic import NonNegativeFloat, NonNegativeInt
 
 import iblrig.base_tasks
-import iblrig.graphic
 from iblrig import choiceworld, misc
 from iblrig.hardware import SOFTCODE
 from iblrig.pydantic_definitions import TrialDataModel
