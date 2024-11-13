@@ -153,7 +153,7 @@ def bpod_trial_data_to_dataframe(bpod_trial_data: dict[str, Any], trial: int) ->
 
     # cast types
     df['Type'] = df['Type'].astype('category')
-    df['State'] = df['State'].astype('category')
+    df['State'] = df['State'].astype('category').ffill()
     df['Event'] = df['Event'].astype('category')
     df.insert(2, 'Trial', pd.to_numeric(pd.Series(trial, index=df.index), downcast='unsigned'))
 
