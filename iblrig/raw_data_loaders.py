@@ -97,7 +97,7 @@ def bpod_session_data_to_dataframe(bpod_data: list[dict[str, Any]], trials: int 
         df['State'] = df['State'].cat.set_categories(categories_state.categories)
         df['Event'] = df['Event'].cat.set_categories(categories_event.categories)
         df['Channel'] = df['Channel'].cat.set_categories(categories_channel.categories)
-    return pd.concat(dataframes, ignore_index=True)
+    return pd.concat(dataframes)
 
 
 def bpod_trial_data_to_dataframe(bpod_trial_data: dict[str, Any], trial: int) -> pd.DataFrame:
@@ -145,9 +145,13 @@ def bpod_trial_data_to_dataframe(bpod_trial_data: dict[str, Any], trial: int) ->
     event_list += [(trial_end - trial_start, 'TrialEnd', pd.NA, pd.NA)]
     event_list = sorted(event_list)
 
-    # create dataframe
+    # create dataframe with TimedeltaIndex
     df = pd.DataFrame(data=event_list, columns=['Time', 'Type', 'State', 'Event'])
-    df['Time'] = pd.to_timedelta(df['Time'] + trial_start, unit='seconds')
+    df.Time = pd.to_timedelta(df.Time + trial_start, unit='seconds')
+    df.set_index('Time', inplace=True)
+    df.rename_axis(index=None, inplace=True)
+
+    # cast types
     df['Type'] = df['Type'].astype('category')
     df['State'] = df['State'].astype('category')
     df['Event'] = df['Event'].astype('category')
