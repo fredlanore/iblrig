@@ -66,7 +66,7 @@ def bpod_session_data_to_dataframe(bpod_data: list[dict[str, Any]], trials: int 
         *  Trial : int
               index of the trial, zero-based
         *  State : str (categorical)
-              name of the state (only for types StateStart and StateEnd)
+              name of the state
         *  Event : str (categorical)
               name of the event (only for type InputEvent)
         *  Channel : str (categorical)
@@ -123,7 +123,7 @@ def bpod_trial_data_to_dataframe(bpod_trial_data: dict[str, Any], trial: int) ->
         *  Trial : int
               index of the trial, zero-based
         *  State : str (categorical)
-              name of the state (only for types StateStart and StateEnd)
+              name of the state
         *  Event : str (categorical)
               name of the event (only for type InputEvent)
         *  Channel : str (categorical)
