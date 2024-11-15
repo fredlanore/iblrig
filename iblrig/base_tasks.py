@@ -28,7 +28,6 @@ import yaml
 from pythonosc import udp_client
 
 import ibllib.io.session_params as ses_params
-import iblrig.graphic as graph
 import iblrig.path_helper
 import pybpodapi
 from ibllib.oneibl.registration import IBLRegistrationClient
@@ -39,7 +38,7 @@ from iblrig.hardware import SOFTCODE, Bpod, RotaryEncoderModule, sound_device_fa
 from iblrig.hifi import HiFi
 from iblrig.path_helper import load_pydantic_yaml
 from iblrig.pydantic_definitions import HardwareSettings, RigSettings, TrialDataModel
-from iblrig.tools import call_bonsai
+from iblrig.tools import call_bonsai, get_number
 from iblrig.transfer_experiments import BehaviorCopier, VideoCopier
 from iblrig.valve import Valve
 from iblutil.io.net.base import ExpMessage
@@ -617,10 +616,10 @@ class BaseSession(ABC):
         self.create_session()
         # When not running the first chained protocol, we can skip the weighing dialog
         first_protocol = int(self.paths.SESSION_RAW_DATA_FOLDER.name.split('_')[-1]) == 0
+
+        # get subject weight
         if self.session_info.SUBJECT_WEIGHT is None and self.interactive and first_protocol:
-            self.session_info.SUBJECT_WEIGHT = graph.numinput(
-                'Subject weighing (gr)', f'{self.session_info.SUBJECT_NAME} weight (gr):', nullable=False
-            )
+            self.session_info.SUBJECT_WEIGHT = get_number('Subject weight (g): ', float, lambda x: x > 0)
 
         def sigint_handler(*args, **kwargs):
             # create a signal handler for a graceful exit: create a stop flag in the session folder
@@ -637,10 +636,11 @@ class BaseSession(ABC):
         log.critical('Graceful exit')
         log.info(f'Session {self.paths.SESSION_RAW_DATA_FOLDER}')
         self.session_info.SESSION_END_TIME = datetime.datetime.now().isoformat()
+
+        # get poop count
         if self.interactive and not self.wizard:
-            self.session_info.POOP_COUNT = graph.numinput(
-                'Poop count', f'{self.session_info.SUBJECT_NAME} droppings count:', nullable=True, askint=True
-            )
+            self.session_info.POOP_COUNT = get_number('Droppings count: ', int, lambda x: x >= 0)
+
         self.save_task_parameters_to_json_file()
         self.register_to_alyx()
         self._execute_mixins_shared_function('stop_mixin')

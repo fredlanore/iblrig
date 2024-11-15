@@ -201,7 +201,10 @@ def _build_bonsai_cmd(
     debug: bool = False,
     bootstrap: bool = True,
     editor: bool = True,
-) -> list[str]:
+    wait: bool = True,
+    check: bool = False,
+    bonsai_executable: str | Path = None,
+) -> subprocess.Popen[bytes] | subprocess.Popen[str | bytes | Any] | subprocess.CompletedProcess:
     """
     Execute a Bonsai workflow within a subprocess call.
 
@@ -232,14 +235,15 @@ def _build_bonsai_cmd(
         If the Bonsai executable does not exist.
         If the specified workflow file does not exist.
     """
-    if not BONSAI_EXE.exists():
-        raise FileNotFoundError(BONSAI_EXE)
+    bonsai_executable = BONSAI_EXE if bonsai_executable is None else bonsai_executable
+    if not bonsai_executable.exists():
+        raise FileNotFoundError(bonsai_executable)
     workflow_file = Path(workflow_file)
     if not workflow_file.exists():
         raise FileNotFoundError(workflow_file)
     create_bonsai_layout_from_template(workflow_file)
 
-    cmd = [str(BONSAI_EXE), str(workflow_file)]
+    cmd = [str(bonsai_executable), str(workflow_file)]
     if start:
         cmd.append('--start' if debug else '--start-no-debug')
     if not editor:
@@ -261,6 +265,7 @@ def call_bonsai(
     editor: bool = True,
     wait: bool = True,
     check: bool = False,
+    bonsai_executable: str | Path = None,
 ) -> subprocess.Popen[bytes] | subprocess.Popen[str | bytes | Any] | subprocess.CompletedProcess:
     """
     Execute a Bonsai workflow within a subprocess call.
@@ -298,7 +303,7 @@ def call_bonsai(
         If the specified workflow file does not exist.
 
     """
-    cmd = _build_bonsai_cmd(workflow_file, parameters, start, debug, bootstrap, editor)
+    cmd = _build_bonsai_cmd(workflow_file, parameters, start, debug, bootstrap, editor, bonsai_executable=bonsai_executable)
     cwd = Path(workflow_file).parent
     log.info(f'Starting Bonsai workflow `{workflow_file.name}`')
     log.debug(' '.join(map(str, cmd)))
@@ -414,3 +419,43 @@ def get_lab_location_dict(hardware_settings: HardwareSettings, iblrig_settings: 
     # TODO: add validation errors/warnings
 
     return lab_location
+
+
+def get_number(
+    prompt: str = 'Enter number: ',
+    numeric_type: type(int) | type(float) = int,
+    validation: Callable[[int | float], bool] = lambda _: True,
+) -> int | float:
+    """
+    Prompt the user for a number input of a specified numeric type and validate it.
+
+    Parameters
+    ----------
+    prompt : str, optional
+        The message displayed to the user when asking for input.
+        Defaults to 'Enter number: '.
+    numeric_type : type, optional
+        The type of the number to be returned. Can be either `int` or `float`.
+        Defaults to `int`.
+    validation : callable, optional
+        A function that takes a number as input and returns a boolean
+        indicating whether the number is valid. Defaults to a function
+        that always returns True.
+
+    Returns
+    -------
+    int or float
+        The validated number input by the user, converted to the specified type.
+
+    Notes
+    -----
+    The function will continue to prompt the user until a valid number
+    is entered that passes the validation function.
+    """
+    value = None
+    while not isinstance(value, numeric_type) or validation(value) is False:
+        try:
+            value = numeric_type(input(prompt).strip())
+        except ValueError:
+            value = None
+    return value

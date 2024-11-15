@@ -1,6 +1,12 @@
 Changelog
 =========
 
+8.25.0
+------
+* feature: fiber photometry loader
+* feature: dataframe converter for Bpod session data 
+* removed: remaining tkinter dialogs
+
 8.24.7
 ------
 * fix: debiasing not working in trainingCW

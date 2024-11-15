@@ -163,6 +163,13 @@ class HardwareSettingsCamera(BunchModel):
     )
 
 
+class HardwareSettingsNeurophotometrics(BunchModel):
+    DEVICE_MODEL: Literal['NP3002'] = 'NP3002'
+    BONSAI_EXECUTABLE: ExistingFilePath = Path(Path.home().joinpath('AppData', 'Local', 'Bonsai', 'Bonsai.exe'))
+    BONSAI_WORKFLOW: Path = Path('devices', 'neurophotometrics', 'FP3002.bonsai')
+    COM_NEUROPHOTOMETRY: str | None = None
+
+
 class HardwareSettingsCameraWorkflow(BunchModel):
     setup: ExistingFilePath | None = Field(
         title='Optional camera setup workflow',
@@ -192,15 +199,16 @@ class HardwareSettings(BunchModel):
     model_config = ConfigDict(title='hardware_settings.yaml')
     RIG_NAME: str
     MAIN_SYNC: bool
-    device_bpod: HardwareSettingsBpod
-    device_frame2ttl: HardwareSettingsFrame2TTL
-    device_rotary_encoder: HardwareSettingsRotaryEncoder
-    device_screen: HardwareSettingsScreen
-    device_sound: HardwareSettingsSound
-    device_valve: HardwareSettingsValve
+    device_bpod: HardwareSettingsBpod | None = None
+    device_frame2ttl: HardwareSettingsFrame2TTL | None = None
+    device_rotary_encoder: HardwareSettingsRotaryEncoder | None = None
+    device_screen: HardwareSettingsScreen | None = None
+    device_sound: HardwareSettingsSound | None = None
+    device_valve: HardwareSettingsValve | None = None
     device_scale: HardwareSettingsScale = HardwareSettingsScale()
     device_cameras: dict[str, dict[str, HardwareSettingsCameraWorkflow | HardwareSettingsCamera]] | None
     device_microphone: HardwareSettingsMicrophone | None = None
+    device_neurophotometrics: HardwareSettingsNeurophotometrics | None = None
     VERSION: str
 
 

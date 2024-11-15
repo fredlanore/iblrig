@@ -227,12 +227,11 @@ class TestRun(BaseTestCases.CommonTestTask):
         self.task_kwargs['interactive'] = True
         self.task_kwargs['task_parameter_file'] = ChoiceWorldSession.base_parameters_file
 
-    @mock.patch('iblrig.base_tasks.graph.numinput', side_effect=(23.5, 20, 35))
+    @mock.patch('iblrig.base_tasks.get_number', side_effect=(23.5, 20, 35))
     def test_dialogs(self, input_mock):
         """Test that weighing dialog used only on first of chained protocols."""
         self.task_kwargs.pop('subject_weight_grams')
         self.task = EmptyHardwareSession(**self.task_kwargs)
-        # Check that weighing GUI created
         self.task.run()
         input_mock.assert_called()
         self.assertEqual(23.5, self.task.session_info['SUBJECT_WEIGHT'])
