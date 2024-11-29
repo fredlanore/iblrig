@@ -1,0 +1,26 @@
+#general variables
+'SESSION_DELAY_START' : [0]
+'CONTRAST_SET': [1.0]  # signed contrast set
+'STIM_GAIN': 4.0  # wheel to stimulus relationship
+
+#pre-cue variables
+'PRECUE_ORIENTATION': [-45, -45, 45, -45, 45, 45, 45, -45, 45, 45, -45, -45] #orientation of gratings
+'PRECUE_POSITION_SET': [0]  # position of the precue on screen
+'PRECUE_PRESENTATION': [4] # duration of the precue
+
+#delay variables
+'DELAY_DURATION_SET': [4, 2, 2, 1, 3, 0.5, 2, 3, 3, 0.5, 1, 2]  # set of delays (ideally should be multiples of the screen refresh rate)
+
+#cue variables
+'CORRECT_CUE_POSITION_SET': [-35, -35, -35, -35, -35, -35, 35, 35, 35, 35, 35, 35]  # position set for the correct cue
+
+#choice and outcome variables
+'CUE_PRESENTATION': [3]
+'REWARD_SET_UL': 1.5  # scalar or list of Ncontrast values
+'TIMEOUT': 100 #time to do the choice
+
+#ITI variables
+'ITI_DURATION': 5  # inter-trial interval duration
+
+#misc
+#'PROBABILITY_SET': [1]  # scalar or list of n signed contrasts values, if scalar all contingencies are equiprobable
