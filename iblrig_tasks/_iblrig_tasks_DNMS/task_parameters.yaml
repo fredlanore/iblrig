@@ -1,26 +1,27 @@
-#general variables
-'SESSION_DELAY_START' : [0]
-'CONTRAST_SET': [1.0]  # signed contrast set
+#General task parameters
+'SESSION_DELAY_START' : [0] # Time before the session starts
+'CONTRAST_SET': [1.0]  # signed contrast set for the stimuli
+'PRECUE_ANGLE_SET': [-45, 45, 45, 45, -45, -45]  # orientation of gratings for precue
 'STIM_GAIN': 4.0  # wheel to stimulus relationship
+#'PROBABILITY_SET': [0.5]  # scalar or list of n signed contrasts values, if scalar all contingencies are equiprobable
+#'STIM_REVERSE': False
 
-#pre-cue variables
-'PRECUE_ORIENTATION': [-45, -45, 45, -45, 45, 45, 45, -45, 45, 45, -45, -45] #orientation of gratings
+#Precue variables
 'PRECUE_POSITION_SET': [0]  # position of the precue on screen
-'PRECUE_PRESENTATION': [4] # duration of the precue
+'PRECUE_PRESENTATION_TIME': 4 # duration of the precue
 
-#delay variables
+#Delay variables
 'DELAY_DURATION_SET': [4, 2, 2, 1, 3, 0.5, 2, 3, 3, 0.5, 1, 2]  # set of delays (ideally should be multiples of the screen refresh rate)
 
-#cue variables
+#Cue variables
 'CORRECT_CUE_POSITION_SET': [-35, -35, -35, -35, -35, -35, 35, 35, 35, 35, 35, 35]  # position set for the correct cue
 
-#choice and outcome variables
-'CUE_PRESENTATION': [3]
-'REWARD_SET_UL': 1.5  # scalar or list of Ncontrast values
-'TIMEOUT': 100 #time to do the choice
+#Choice parameters
+'CUE_PRESENTATION_TIME' : 3
 
-#ITI variables
-'ITI_DURATION': 5  # inter-trial interval duration
+#Outcome parameters
+'REWARD_SET_UL': [1.5]  # scalar or list of Ncontrast values, in microliters
+'TIMEOUT' : 5 #possible timeout, in seconds
 
-#misc
-#'PROBABILITY_SET': [1]  # scalar or list of n signed contrasts values, if scalar all contingencies are equiprobable
+#ITI parameters
+'ITI_DURATION': 5  # inter-trial interval duration, in seconds
