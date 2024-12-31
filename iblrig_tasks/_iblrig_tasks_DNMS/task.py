@@ -1,109 +1,139 @@
+
 """
  DNMS (Delayed Non-Match-To-Sample) task
 """
 from pathlib import Path
 
 import logging
-import pydantic
-import pybpodapi.protocol
 import numpy as np
 import pandas as pd
 import yaml
-from pydantic import NonNegativeFloat
 
 import iblrig.misc
-from iblrig.base_tasks import BaseSession #what world to import? Or rather create a new one? Or simply implement the new class called DNMS session inside of the base_choice_world?
+import iblrig.base_choice_world
+from iblrig.base_choice_world import NTRIALS_INIT, ActiveChoiceWorldSession, ActiveChoiceWorldTrialData
 from iblrig.hardware import SOFTCODE
+from typing import Annotated, Any
 from pybpodapi.protocol import StateMachine
-# from iblrig.base_choice_world import NTRIALS_INIT, ActiveChoiceWorldSession
+from pydantic import NonNegativeFloat, NonNegativeInt
+from annotated_types import Interval, IsNan
+
 
 # read defaults from task_parameters.yaml
 with open(Path(__file__).parent.joinpath('task_parameters.yaml')) as f:
     DEFAULTS = yaml.safe_load(f)
 
-class DNMSSession(BaseSession):
+class DNMSChoiceWorldTrialData(ActiveChoiceWorldTrialData):
+
+    # add other variables as well..?
+    delay_duration: NonNegativeFloat
+    precue_angle: Annotated[float, Interval(ge=-180.0, le=180.0)]
+    iti_duration: NonNegativeFloat
+    timeout: NonNegativeFloat
+    correct_cue_position: float 
+    cue_presentation_time: NonNegativeFloat
+
+    response_side: Annotated[int, Interval(ge=-1, le=1)]
+    response_time: NonNegativeFloat
+    trial_correct: bool
+    
+
+   
+class DNMSSession(ActiveChoiceWorldSession):
      """
-    DNMS Choice World is the ChoiceWorld task targeting working memory processes. It happens in several epochs:
+    DNMS Choice World is the ChoiceWorld task engaging working memory processes. It contains several epochs:
     1. Precue presentation: a visual stimulus is shown on the screen
     2. Delay: a gray screen is shown
-    3. Cue presentation: 2 visual stimuli are shown, one of them is identical to the precue and another is the mirror image of the precue
+    3. Cue presentation: 2 visual stimuli are shown, one of them identical to the precue and another the mirror image of the precue
     4. Closed loop: the mouse has to choose between the two stimuli. Possible outcomes are correct choice, error, or no-go.
     5. Feedback: the mouse gets a reward if it chooses the correct stimulus, i.e. the one that mismatches the precue
     6. ITI: the mouse waits for the next trial
     It differs from BaseChoiceWorld in that it implements the additional epochs and shows 2 visual stimuli on the screen.
     """
-    protocol_name = '_iblrig_tasks_DelayedNonMatchToSample'
-    #TrialDataModel = DNMSChoiceTrialData
+     protocol_name = '_iblrig_tasks_DelayedNonMatchToSample'
+     TrialDataModel = DNMSChoiceWorldTrialData
 
-    def __init__(
+     def __init__(
         self,
         *args,
         contrast_set: float = DEFAULTS['CONTRAST_SET'],
+        precue_angle_set: float = DEFAULTS['PRECUE_ANGLE_SET'], 
         #probability_set: list[float] = DEFAULTS['PROBABILITY_SET'],
         #stim_reverse: float = DEFAULTS['STIM_REVERSE'],
         reward_set_ul: float = DEFAULTS['REWARD_SET_UL'],
         stim_gain: float = DEFAULTS['STIM_GAIN'],
         precue_position_set: list[float] = DEFAULTS['PRECUE_POSITION_SET'],
-        precue_presentation: float = DEFAULTS['PRECUE_PRESENTATION'],
+        precue_presentation_time: float = DEFAULTS['PRECUE_PRESENTATION_TIME'],
         delay_duration: list[float] =DEFAULTS['DELAY_DURATION_SET'],
         correct_cue_position_set: list[float] = DEFAULTS['CORRECT_CUE_POSITION_SET'],
-        cue_presentation: float = DEFAULTS['CUE_PRESENTATION'],
+        cue_presentation_time: float = DEFAULTS['CUE_PRESENTATION_TIME'],
         timeout: float = DEFAULTS['TIMEOUT'],
         iti_duration: float = DEFAULTS['ITI_DURATION'],
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        nc = len(delay_duration)
+        nc = len(precue_angle_set)
+        assert len(delay_duration) in [nc, 1], 'precue_position_set must be a scalar or have the same length as delay_duration'
         assert len(precue_position_set) in [nc, 1], 'precue_position_set must be a scalar or have the same length as delay_duration'
         assert len(correct_cue_position_set) == nc, 'correct_cue_position_set must have the same length as delay_duration'
+        assert len(precue_angle_set) in [nc, 1], 'precue orientation set must be a scalar or have the same length as delay_duration'
         assert len(reward_set_ul) in [nc, 1], 'reward_set_ul must be a scalar or have the same length as delay_duration'
+        
+        # variables remaining constant from trial to trial should be stored 
         self.task_params['CONTRAST_SET'] = contrast_set
-        #self.task_params['PROBABILITY_SET'] = probability_set
-        #self.task_params['STIM_REVERSE'] = stim_reverse
         self.task_params['STIM_GAIN'] = stim_gain
         self.task_params['REWARD_SET_UL'] = reward_set_ul
         self.task_params['PRECUE_POSITION_SET'] = precue_position_set
-        self.task_params['PRECUE_PRESENTATION'] = precue_presentation
-        self.task_params['DELAY_DURATION'] = delay_duration
-        self.task_params['CORRECT_CUE_POSITION_SET'] = correct_cue_position_set
-        self.task_params['CUE_PRESENTATION'] = cue_presentation
+        self.task_params['PRECUE_PRESENTATION_TIME'] = precue_presentation_time
+        self.task_params['CUE_PRESENTATION_TIME'] = cue_presentation_time
         self.task_params['TIMEOUT'] = timeout
         self.task_params['ITI_DURATION'] = iti_duration
-        
-        #should I put all the parameters in the dataframe..?
-        self.df_contingencies = pd.DataFrame(columns=['delay', 'correct_cue_position', 'reward_amount_ul'])
+        #self.task_params['PROBABILITY_SET'] = probability_set
+        #self.task_params['STIM_REVERSE'] = stim_reverse
+
+        #variables that change from trial to trial should be stored into dataframe 
+        self.df_contingencies = pd.DataFrame(columns=['precue_angle', 'delay', 'correct_cue_position'])
+        self.df_contingencies['precue_angle'] = precue_angle_set if len(precue_angle_set) == nc else precue_angle_set[0]
         self.df_contingencies['delay'] = delay_duration
         self.df_contingencies['correct_cue_position'] = correct_cue_position_set
-        self.df_contingencies['reward_amount_ul'] = reward_set_ul if len(reward_set_ul) == nc else reward_set_ul[0]
         #self.df_contingencies['contrast'] = contrast_set if len(contrast_set) == nc else contrast_set[0]
 
 
-    def draw_next_trial_info(self, **kwargs):
+     def draw_next_trial_info(self, pleft=0.5, **kwargs):
         nc = self.df_contingencies.shape[0]
-        ic = np.random.choice(np.arange(nc), p=self.df_contingencies['probability'])
         # now calling the super class with the proper parameters
         super().draw_next_trial_info(
-            delay = self.df_contingencies.at[ic, 'delay'],
-            correct_cue_position=self.df_contingencies.at[ic, 'correct_cue_position'],
-            reward_amount=self.df_contingencies.at[ic, 'reward_amount_ul'],
+            precue_angle = self.df_contingencies.at[nc, 'precue_angle'],
+            delay = self.df_contingencies.at[nc, 'delay'],
+            correct_cue_position=self.df_contingencies.at[nc, 'correct_cue_position'],
         )
     
-    @property
-    def reward_amount(self):
+     @property
+     def reward_amount(self):
         return self.task_params.REWARD_AMOUNTS_UL[0] 
+     
+     @property
+     def precue_angle(self):
+        #return self.task_params.PRECUE_ANGLE_SET 
+        return self.df_contingencies['precue_angle']
+     
+     @property
+     def delay_duration(self):
+        #return self.task_params.DELAY_DURATION_SET
+        return self.df_contingencies['delay']
     
-    @property
-    def correct_cue_position(self):
-        return self.task_params.CORRECT_CUE_POSITION_SET[0] #unsure about the index, should it be deleted?
+     @property
+     def correct_cue_position(self):
+        #return self.task_params.CORRECT_CUE_POSITION_SET 
+        return self.df_contingencies['correct_cue_position']
     
-    @property
-    def delay_duration(self):
-        return self.task_params.DELAY_DURATION_SET[0] #unsure about the index, should it be deleted?
+     
     
-    @staticmethod
-    def extra_parser():
+     @staticmethod
+     def extra_parser():
         """:return: argparse.parser()"""
-        parser = super(Session, Session).extra_parser()
+        parser = super(DNMSSession, DNMSSession).extra_parser()
+
         parser.add_argument(
             '--contrast_set',
             option_strings=['--contrast_set'],
@@ -123,6 +153,27 @@ class DNMSSession(BaseSession):
             type=float,
             help='Reward for contrast in contrast set.',
         )
+
+        parser.add_argument(
+            '--precue_angle_set',
+            option_strings=['--precue_angle_set'],
+            dest='precue_angle_set',
+            default=DEFAULTS['PRECUE_ANGLE_SET'],
+            nargs='+',
+            type=float,
+            help='Angle for each precue.',
+        )
+
+        parser.add_argument(
+            '--delay_duration',
+            option_strings=['--delay_duration'],
+            dest='delay_duration',
+            default=DEFAULTS['DELAY_DURATION_SET'],
+            nargs='+',
+            type=float,
+            help='Delay for each epoch.',
+        )
+
         parser.add_argument(
             '--correct_cue_position_set',
             option_strings=['--correct_cue_position_set'],
@@ -132,6 +183,7 @@ class DNMSSession(BaseSession):
             type=float,
             help='Position for each correct cue in correct_cue set.',
         )
+
         parser.add_argument(
             '--stim_gain',
             option_strings=['--stim_gain'],
@@ -143,20 +195,21 @@ class DNMSSession(BaseSession):
 
         return parser
 
-    def next_trial(self):
+     def next_trial(self):
         # update counters
         self.trial_num += 1
         # save and send trial info to bonsai
-        self.draw_next_trial_info(pleft=self.task_params.PROBABILITY_LEFT)
+        self.draw_next_trial_info(pleft=0.5)
 
 
-    def get_state_machine_trial(self, i):
+     def get_state_machine_trial(self, i):
         sma = StateMachine(self.bpod)
         log = logging.getLogger(__name__)
 
         #FIRST TRIAL
         if i == 0:  # First trial exception start camera
             session_delay_start = self.task_params.get('SESSION_DELAY_START', 0)
+            log.info(f"Starting trial {i + 1}")
             log.info('First trial initializing, will move to next trial only if:')
             log.info('1. camera is detected')
             log.info(f'2. {session_delay_start} sec have elapsed')
@@ -200,21 +253,25 @@ class DNMSSession(BaseSession):
             },
         )
 
+        log.info('Quiescent period OFF')
+
         # PRECUE EPOCH
         # Show the visual stimulus. This is achieved by sending a time-stamped byte-message to Bonsai via the Rotary
         # Encoder Module's ongoing USB-stream. Move to the next state once the Frame2TTL has been triggered, i.e.,
         # when the stimulus has been rendered on screen. Use the state-timer as a backup to prevent a stall.
         sma.add_state(
             state_name='precue_on',
-            state_timer=self.task_params.PRECUE_PRESENTATION, #should I define state_timer like this or by calling precue_presentation variable?
+            state_timer=self.task_params.PRECUE_PRESENTATION_TIME,
             output_actions=[self.bpod.actions.bonsai_show_stim],
             state_change_conditions={'Tup': 'interactive_delay', 'BNC1High': 'interactive_delay', 'BNC1Low': 'interactive_delay'},
         )
 
+        log.info('Precue ON for ' + str(self.task_params.PRECUE_PRESENTATION_TIME) + ' seconds')
+
         # Defined delay between visual and auditory cues (could the presentation of auditive and visual cues be merged into one sma?)
         sma.add_state(
             state_name='interactive_delay',
-            state_timer= 0.05
+            state_timer= 0.05,
             output_actions=[],
             state_change_conditions={'Tup': 'play_tone'},
         )
@@ -228,11 +285,13 @@ class DNMSSession(BaseSession):
         )
 
         sma.add_state(
-            state_name='precue_off',
-            state_timer=0.1
+        state_name='precue_off',
+            state_timer=0.1,
             output_actions=[self.bpod.actions.bonsai_hide_stim],
             state_change_conditions={'Tup': 'reset2_rotary_encoder', 'BNC1High': 'reset2_rotary_encoder', 'BNC1Low': 'reset2_rotary_encoder'},
         )
+
+        log.info('Precue OFF')
 
         # Reset rotary encoder (see above). Move on after brief delay (to avoid a race conditions in the bonsai flow).
         sma.add_state(
@@ -243,20 +302,25 @@ class DNMSSession(BaseSession):
         )
 
         # DELAY EPOCH
+        #delay is called from the dataframe
         sma.add_state(
             state_name='delay_on',
-            state_timer=self.task_params.DELAY_DURATION_SET, #same question as previously for the precue-on sma
-            output_actions=[('delay duration', self.task_params.DELAY_DURATION_SET)], #is it necessary to call upon bonsai to show the gray background that we see during the cue presentation?
+            state_timer=self.df_contingencies['delay'], 
+            output_actions=[('delay duration', self.df_contingencies['delay'])], #is it necessary to call upon bonsai to show the gray background that we see during the cue presentation?
             state_change_conditions={'Tup': 'cue_on'},
         )
+
+        log.info('Delay ON for ' + str(self.df_contingencies['delay']) + ' seconds')
 
         # CUE EPOCH
         sma.add_state(
             state_name='cue_on',
-            state_timer=self.task_params.CUE_PRESENTATION, #same question as previously for the precue-on sma
-            output_actions=[self.bpod.actions.bonsai_show_stim, ('cue presentation', self.task_params.CUE_PRESENTATION)],
+            state_timer=self.task_params.CUE_PRESENTATION_TIME,
+            output_actions=[self.bpod.actions.bonsai_show_stim, ('cue presentation', self.task_params.CUE_PRESENTATION_TIME)],
             state_change_conditions={'Tup': 'reset2_rotary_encoder', 'BNC1High': 'reset2_rotary_encoder', 'BNC1Low': 'reset2_rotary_encoder'},
         )
+
+        log.info('Cue ON for ' + str(self.task_params.CUE_PRESENTATION_TIME) + ' seconds')
 
         sma.add_state(
             state_name='reset2_rotary_encoder',
@@ -340,10 +404,12 @@ class DNMSSession(BaseSession):
             state_change_conditions={'Tup': 'exit'},
         )
 
+        log.info('Trial is over, ITI ON for ' + str(self.task_params.ITI_DURATION) + ' seconds')
+
         return sma
 
 #launches the task
 if __name__ == '__main__':  # pragma: no cover
-    kwargs = iblrig.misc.get_task_arguments(parents=[Session.extra_parser()])
-    sess = Session(**kwargs)
+    kwargs = iblrig.misc.get_task_arguments(parents=[DNMSSession.extra_parser()])
+    sess = DNMSSession(**kwargs)
     sess.run()
