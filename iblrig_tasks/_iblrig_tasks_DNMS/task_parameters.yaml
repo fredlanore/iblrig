@@ -1,27 +1,42 @@
-#General task parameters
-'SESSION_DELAY_START' : [0] # Time before the session starts
-'CONTRAST_SET': [1.0]  # signed contrast set for the stimuli
-'PRECUE_ANGLE_SET': [-45, 45, 45, 45, -45, -45]  # orientation of gratings for precue
-'STIM_GAIN': 4.0  # wheel to stimulus relationship
-#'PROBABILITY_SET': [0.5]  # scalar or list of n signed contrasts values, if scalar all contingencies are equiprobable
-#'STIM_REVERSE': False
+#iterated variables; length should correspond to the nb of trials to run, else error
+'VARIABLE_DELAY': false
+'VARIABLE_DELAY_SET': [4, 8, 12, 1, 0, 5, 1, 2, 3, 6, 4, 10, 5, 1] 
+'FIXED_DELAY': 1 # is applied if the "variable delay" is false
 
-#Precue variables
-'PRECUE_POSITION_SET': [0]  # position of the precue on screen
-'PRECUE_PRESENTATION_TIME': 4 # duration of the precue
+'STIM_ANGLE_SET': [45, 135, 45, 45, 135, 135, 45, 135, 45, 135, 135] #precue/correct cue info
+#'CORRECT_CUE_POSITION' : [-35, 35, 35, -35, -35, 35, 35, 35, 35, 35, -35, -35,] #to implement when 2 visual stimuli
 
-#Delay variables
-'DELAY_DURATION_SET': [4, 2, 2, 1, 3, 0.5, 2, 3, 3, 0.5, 1, 2]  # set of delays (ideally should be multiples of the screen refresh rate)
+#fixed visual stimulus parameters
+'VISUAL_STIMULUS': GaborIBLTask/Gabor2D.bonsai  # null / passiveChoiceWorld_passive.bonsai
+'PRECUE_PRESENTATION_TIME': 2.0
+'CUE_PRESENTATION_TIME': 2.0
+'STIM_POSITIONS': [-35, 35]
+'STIM_FREQ': 0.1 
+'STIM_PHASE': 1.0
+'STIM_SIGMA': 7 
+'CONTRAST_SET': [1.0]
+'STIM_GAIN' : 4.0
 
-#Cue variables
-'CORRECT_CUE_POSITION_SET': [-35, -35, -35, -35, -35, -35, 35, 35, 35, 35, 35, 35]  # position set for the correct cue
+#fixed auditory cues parameters (unmodified, here for reference)
+'WHITE_NOISE_AMPLITUDE': 0.05
+'WHITE_NOISE_DURATION': 0.5
+'WHITE_NOISE_IDX': 3
 
-#Choice parameters
-'CUE_PRESENTATION_TIME' : 3
+'GO_TONE_AMPLITUDE': 0.0272
+'GO_TONE_DURATION': 0.11
+'GO_TONE_IDX': 2
+'GO_TONE_FREQUENCY': 5000
 
-#Outcome parameters
-'REWARD_SET_UL': [1.5]  # scalar or list of Ncontrast values, in microliters
-'TIMEOUT' : 5 #possible timeout, in seconds
+#fixed choice epoch parameters
+'OMIT_FEEDBACK_PROBABILITY': 0
+'CHOICE_DELAY': 0 #delay before reward; 
+                  #is applied if the choice delay strategy is set at "fixed" in the task.py
+'VARIABLE_REWARDS': false #if true, rew is a draw from uniform distribution between 1 and 3 µL (can be adjusted in the task.py)
+'FIXED_REWARD_AMOUNT_UL' : 1.5
 
-#ITI parameters
-'ITI_DURATION': 5  # inter-trial interval duration, in seconds
+#fixed time parameters
+'DEAD_TIME': 0.5  # the length of time before entering the next trial. This plus ITI_DELAY_SECS define period of closed-loop grey screen
+'ITI_DELAY_SECS': 4  # was originally set at 2; this is the length of the ITI state at the end of the session. 0.5 seconds are added to it until the next trial start
+'INTERACTIVE_DELAY': 0.0
+'RESPONSE_WINDOW': 60
+'REWARD_TYPE': Water
